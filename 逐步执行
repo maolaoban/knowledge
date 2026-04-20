@@ -1,0 +1,70 @@
+async function execute(fn, stepState) {
+  let newStep = null;
+
+  // Run the user function in the background. It will hang at the new step
+  fn({
+    run: async (id, callback) => {
+      // If this step already ran, return the memoized result
+      if (stepState.has(id)) {
+        return stepState.get(id);
+      }
+
+      // This is a new step. Report it
+      newStep = { id, callback };
+
+      // Hang forever
+      return new Promise(() => {});
+    },
+  });
+  
+  // Schedule a macrotask. All pending microtasks (the resolved awaits from
+  // memoized steps) will drain before this runs, giving the workflow function
+  // time to advance through already-completed steps and reach the next new one.
+  await new Promise((r) => setTimeout(r, 0));
+
+  if (newStep) {
+    // A new step was found. Execute it and save the result
+    const result = await newStep.callback();
+    stepState.set(newStep.id, result);
+
+    // Function is not done
+    return false;
+  }
+
+  // Function is done
+  return true;
+}
+
+// User-defined workflow function
+async function myWorkflow(step) {
+  console.log("  Workflow: top");
+
+  const data = await step.run("fetch", () => {
+    console.log("  Step: fetch");
+    return [1, 2, 3];
+  });
+
+  const processed = await step.run("process", () => {
+    console.log("  Step: process");
+    return data.map((n) => n * 2);
+  });
+
+  console.log("  Workflow: complete", processed);
+}
+
+async function main() {
+  // In-memory store of completed step results
+  const stepState = new Map();
+
+  // Keep entering the workflow function until it's done
+  let done = false;
+  let i = 0;
+  while (!done) {
+    console.log(`Run ${i}:`);
+    done = await execute(myWorkflow, stepState);
+    console.log("--------------------------------");
+    i++;
+  }
+}
+
+main();
