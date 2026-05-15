@@ -1,0 +1,19 @@
+  name: Notify Blog Repo                                                                      
+                                                                                              
+  on:                                                                                         
+    push:                                                                                     
+      branches: [main]                                                                      
+      paths:                                                                                  
+        - '*.md'
+                                                                                              
+  jobs:                                                                                     
+    notify:                                                                                   
+      runs-on: ubuntu-latest                                                                  
+      steps:                                                                                  
+        - name: Send repository_dispatch event                                                
+          uses: peter-evans/repository-dispatch@v3                                            
+          with:                                                                               
+            token: ${{ secrets.BLOG_REPO_TOKEN }}                                             
+            repository: maolaoban/github.io                                                   
+            event-type: sync-knowledge                                                        
+            client-payload: '{"sha": "${{ github.sha }}"}'  
